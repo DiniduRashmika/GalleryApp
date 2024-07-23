@@ -3,6 +3,7 @@ package com.testapp.gallery;
 import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
@@ -46,6 +47,16 @@ public class ViewActivity extends AppCompatActivity {
         dbHelper = new SQLiteHelper(this);
 
         String path = getIntent().getStringExtra("path");
+        String photouserid = getIntent().getStringExtra("userid");
+
+        SharedPreferences sharedPreferences = getSharedPreferences("Startup", MODE_PRIVATE);
+        String useremail = sharedPreferences.getString("email","");
+        String userid = dbHelper.getUserIdByEmail(useremail);
+
+        if (!photouserid.equals(userid)) {
+            delBtn.setVisibility(View.GONE);
+            delBtn.setEnabled(false);
+        }
 
         if (path != null){
             showImage(path);

@@ -1,188 +1,122 @@
 package com.testapp.gallery;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
+import android.os.Build;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.view.View;
-import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.TextView;
+import android.os.Handler;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.navigation.NavigationBarView;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
-    ImageButton captureBtn;
-    SQLiteHelper dbHelper;
-    private List<Image> imageList;
-    private ImageAdapter imageAdapter;
-    private RecyclerView imageContainer;
-    TextView noimages;
-    EditText searchTxt;
+    FrameLayout fragLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        if (!allPermissionsGranted()) {
-            Intent intent = new Intent(MainActivity.this, PermissionActivity.class);
+        BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
+        fragLayout = findViewById(R.id.fragment_container);
+
+        SharedPreferences sharedPreferences = getSharedPreferences("Startup", MODE_PRIVATE);
+        String checkStart = sharedPreferences.getString("isStarted","");
+
+        if (!checkStart.equals("yes")){
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
             startActivity(intent);
             finish();
-        }
-
-        dbHelper = new SQLiteHelper(MainActivity.this);
-
-        captureBtn = findViewById(R.id.capture_btn);
-        noimages = findViewById(R.id.empty_text);
-
-        searchTxt = findViewById(R.id.search_txt);
-
-        captureBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, CaptureActivity.class);
+        }else {
+            if (!allPermissionsGranted()) {
+                Intent intent = new Intent(MainActivity.this, PermissionActivity.class);
                 startActivity(intent);
+                finish();
+            }
+        }
+
+        bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
+
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int itemId = item.getItemId();
+                Menu menu = bottomNavigationView.getMenu();
+
+                Fragment selectedFragment = null;
+
+                menu.findItem(R.id.navigation_feed).setIcon(R.drawable.ic_feed);
+                menu.findItem(R.id.navigation_profile).setIcon(R.drawable.ic_account);
+
+                if (itemId == R.id.navigation_feed) {
+                    item.setIcon(R.drawable.ic_feed_filled);
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, new FeedFragment())
+                            .commit();
+                    return true;
+
+                } else if (itemId == R.id.navigation_profile) {
+                    item.setIcon(R.drawable.ic_account_filled);
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, new ProfileFragment())
+                            .commit();
+                    return true;
+
+                }
+
+                if (selectedFragment != null) {
+                    FragmentManager fragmentManager = getSupportFragmentManager();
+                    FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                    fragmentTransaction.replace(R.id.fragment_container, selectedFragment);
+                    fragmentTransaction.commit();
+                }
+
+                return false;
             }
         });
 
-        imagesLoader();
-        setupSearchListener();
-
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        imagesLoader();
-        setupSearchListener();
-    }
-
-    private void imagesLoader() {
-
-        imageContainer = findViewById(R.id.image_container);
-        dbHelper = new SQLiteHelper(this);
-        imageList = new ArrayList<>();
-        imageAdapter = new ImageAdapter(imageList, this);
-
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
-        imageContainer.setLayoutManager(layoutManager);
-
-        imageContainer.setAdapter(imageAdapter);
-
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String[] projection = {"path", "timestamp", "lat", "lon"};
-        Cursor cursor = db.query("captures", projection, null, null, null, null, "timestamp DESC");
-
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-
-                String path = cursor.getString(cursor.getColumnIndexOrThrow("path"));
-                String timestamp = cursor.getString(cursor.getColumnIndexOrThrow("timestamp"));
-                String lat = cursor.getString(cursor.getColumnIndexOrThrow("lat"));
-                String lon = cursor.getString(cursor.getColumnIndexOrThrow("lon"));
-
-                Image image = new Image(path, timestamp, lat, lon);
-                imageList.add(image);
-            } while (cursor.moveToNext());
-            noimages.setVisibility(View.GONE);
-            cursor.close();
-            imageContainer.setVisibility(View.VISIBLE);
-            searchTxt.setEnabled(true);
-            imageAdapter.notifyDataSetChanged();
-        }else{
-            imageContainer.setVisibility(View.GONE);
-            noimages.setVisibility(View.VISIBLE);
-            searchTxt.setEnabled(false);
+        if (savedInstanceState == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new FeedFragment())
+                    .commit();
         }
 
-        db.close();
-
-    }
-
-    private void setupSearchListener() {
-
-        searchTxt.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String searchText = s.toString().trim();
-                searchImages(searchText);
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-
-            }
-        });
-    }
-
-    private void searchImages(String searchText) {
-
-        imageList.clear();
-
-        if (searchText.isEmpty()) {
-            imagesLoader();
-            return;
-        }
-
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        String[] projection = {"path", "timestamp", "lat", "lon"};
-        String selection = "timestamp LIKE ? ";
-        String[] selectionArgs = new String[]{"%" + searchText + "%"};
-
-        Cursor cursor = db.query("captures", projection, selection, selectionArgs, null, null, null);
-
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                String path = cursor.getString(cursor.getColumnIndexOrThrow("path"));
-                String timestamp = cursor.getString(cursor.getColumnIndexOrThrow("timestamp"));
-                String lat = cursor.getString(cursor.getColumnIndexOrThrow("lat"));
-                String lon = cursor.getString(cursor.getColumnIndexOrThrow("lon"));
-
-
-                Image image = new Image(path, timestamp, lat, lon);
-                imageList.add(image);
-
-            } while (cursor.moveToNext());
-
-            cursor.close();
-            imageAdapter.notifyDataSetChanged();
-        }else{
-            noimages.setVisibility(View.VISIBLE);
-            noimages.setText("No images found");
-            imageContainer.setVisibility(View.GONE);
-            imageList.clear();
-            imageAdapter.notifyDataSetChanged();
-        }
-
-        db.close();
     }
 
     private boolean allPermissionsGranted() {
-        String[] REQUIRED_PERMISSIONS = new String[]{
+        String[] REQUIRED_PERMISSIONS_ANDROID_12 = new String[]{
                 android.Manifest.permission.INTERNET,
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
                 android.Manifest.permission.READ_EXTERNAL_STORAGE,
@@ -191,12 +125,39 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.CAMERA
         };
 
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                return false;
+        String[] REQUIRED_PERMISSIONS_ANDROID_13 = new String[]{
+                android.Manifest.permission.INTERNET,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.CAMERA
+        };
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {  // API level 33
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_13) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+            return true;
+        }else{
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_12) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
             }
         }
         return true;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
     }
 
 }

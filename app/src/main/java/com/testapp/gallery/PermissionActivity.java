@@ -1,15 +1,18 @@
 package com.testapp.gallery;
 
-
 import android.Manifest;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.TextClock;
+import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -24,7 +27,7 @@ public class PermissionActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_PERMISSIONS = 1001;
     private TextView permissionBtn;
 
-    String[] REQUIRED_PERMISSIONS = new String[]{
+    String[] REQUIRED_PERMISSIONS_ANDROID_12 = new String[]{
             android.Manifest.permission.INTERNET,
             android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
             android.Manifest.permission.READ_EXTERNAL_STORAGE,
@@ -33,11 +36,19 @@ public class PermissionActivity extends AppCompatActivity {
             Manifest.permission.CAMERA
     };
 
+    String[] REQUIRED_PERMISSIONS_ANDROID_13 = new String[]{
+            android.Manifest.permission.INTERNET,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.CAMERA
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_permission);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         permissionBtn = findViewById(R.id.permission_Btn);
 
@@ -58,20 +69,38 @@ public class PermissionActivity extends AppCompatActivity {
 
     private boolean allPermissionsGranted() {
 
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {  // API level 33
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_13) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+            return true;
+        }else{
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_12) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
             }
         }
+
         return true;
     }
 
     private void requestPermissionsIfNeeded() {
         List<String> permissionsNeeded = new ArrayList<>();
 
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(permission);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {  // API level 33
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_13) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    permissionsNeeded.add(permission);
+                }
+            }
+        }else{
+            for (String permission : REQUIRED_PERMISSIONS_ANDROID_12) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    permissionsNeeded.add(permission);
+                }
             }
         }
 
@@ -89,7 +118,7 @@ public class PermissionActivity extends AppCompatActivity {
                 startActivity(intent);
                 finish();
             } else {
-                // Permission denied, handle accordingly (e.g., show an explanation or disable functionality)
+                Toast.makeText(this, "Permissions not granted!", Toast.LENGTH_SHORT).show();
             }
         }
     }

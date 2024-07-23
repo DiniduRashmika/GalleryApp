@@ -6,6 +6,7 @@ import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -63,7 +64,7 @@ public class CaptureActivity extends AppCompatActivity {
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private ImageCapture imageCapture;
     ProcessCameraProvider cameraProvider;
-    String capturePath = null, latitudeString = null, longitudeString = null, timeStamp = null;
+    String capturePath = null, latitudeString = null, longitudeString = null, timeStamp = null, userid = null;
     boolean isBind = true;
 
     @Override
@@ -72,12 +73,6 @@ public class CaptureActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.activity_capture);
-
-        if (!allPermissionsGranted()) {
-            Intent intent = new Intent(CaptureActivity.this, PermissionActivity.class);
-            startActivity(intent);
-            finish();
-        }
 
         dbHandler = new SQLiteHelper(CaptureActivity.this);
 
@@ -101,6 +96,10 @@ public class CaptureActivity extends AppCompatActivity {
 
             }
         });
+
+        SharedPreferences sharedPreferences = getSharedPreferences("Startup", MODE_PRIVATE);
+        String useremail = sharedPreferences.getString("email","");
+        userid = dbHandler.getUserIdByEmail(useremail);
 
     }
 
@@ -182,7 +181,7 @@ public class CaptureActivity extends AppCompatActivity {
                             capturePath = outputFile.getAbsolutePath();
                             Log.d(TAG, "Image saved successfully: " + outputFile.getAbsolutePath());
                             Toast.makeText(CaptureActivity.this, "Image Saved", Toast.LENGTH_SHORT).show();
-                            dbHandler.addCapture(capturePath, timeStamp, latitudeString, longitudeString);
+                            dbHandler.addCapture(userid, capturePath, timeStamp, latitudeString, longitudeString);
                             processCapturePath(context);
                         }
 
@@ -216,45 +215,24 @@ public class CaptureActivity extends AppCompatActivity {
     private void processCapturePath(Context context) {
         if (capturePath != null) {
             Log.d(TAG, "Capture path: " + capturePath);
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                Uri uri = Uri.fromFile(new File(capturePath));
+            Uri uri = Uri.fromFile(new File(capturePath));
 
-                try {
-                    bitmap = BitmapFactory.decodeStream(context.getContentResolver().openInputStream(uri));
+            try {
+                bitmap = BitmapFactory.decodeStream(context.getContentResolver().openInputStream(uri));
 
-                    cameraProvider.unbindAll();
-                    camBtn.setText("Open Camera");
-                    isBind = false;
-                    latitudeString = null;
-                    longitudeString = null;
-                    timeStamp = null;
+                cameraProvider.unbindAll();
+                camBtn.setText("Open Camera");
+                isBind = false;
+                latitudeString = null;
+                longitudeString = null;
+                timeStamp = null;
 
-                } catch (IOException e) {
-                    Log.e(TAG, "Error loading captured image: " + e.getMessage());
-                    Toast.makeText(CaptureActivity.this, "Error loading image.", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                Toast.makeText(CaptureActivity.this, "Permission Problem", Toast.LENGTH_SHORT).show();
+            } catch (IOException e) {
+                Log.e(TAG, "Error loading captured image: " + e.getMessage());
+                Toast.makeText(CaptureActivity.this, "Error loading image.", Toast.LENGTH_SHORT).show();
             }
         } else {
             Toast.makeText(CaptureActivity.this, "Capture Path null", Toast.LENGTH_SHORT).show();
         }
-    }
-    private boolean allPermissionsGranted() {
-        String[] REQUIRED_PERMISSIONS = new String[]{
-                android.Manifest.permission.INTERNET,
-                android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.CAMERA
-        };
-
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                return false;
-            }
-        }
-        return true;
     }
 }

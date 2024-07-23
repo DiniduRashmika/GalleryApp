@@ -1,7 +1,10 @@
 package com.testapp.gallery;
 
+import static android.content.Context.MODE_PRIVATE;
+
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,8 +31,10 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     private List<Image> imageList;
     private Context context;
+    private SQLiteHelper dbHandler;
 
     public ImageAdapter(List<Image> imageList, Context context) {
+        dbHandler = new SQLiteHelper(context);
         this.imageList = imageList;
         this.context = context;
     }
@@ -53,15 +58,16 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
                 .placeholder(R.drawable.placeholder)
                 .into(holder.objImg);
 
-        holder.titleTxt.setText(image.getTimestamp());
-        holder.timeTxt.setText(image.getImgPath());
-        holder.locTxt.setText("Lat: " + image.getLat() + ", Lon: " + image.getLon());
+        SharedPreferences sharedPreferences = context.getSharedPreferences("Startup", MODE_PRIVATE);
+        String useremail = sharedPreferences.getString("email","");
+        String userid = dbHandler.getUserIdByEmail(useremail);
 
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent intent = new Intent(context, ViewActivity.class);
                 intent.putExtra("path", image.getImgPath());
+                intent.putExtra("userid", userid);
                 context.startActivity(intent);
 
             }
@@ -78,14 +84,10 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         ImageView objImg;
-        TextView titleTxt, timeTxt, locTxt;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             objImg = itemView.findViewById(R.id.image_pic);
-            titleTxt = itemView.findViewById(R.id.image_title);
-            timeTxt = itemView.findViewById(R.id.image_timestamp);
-            locTxt = itemView.findViewById(R.id.image_location);
 
         }
     }
